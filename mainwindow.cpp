@@ -84,16 +84,15 @@ void MainWindow::load(const QString& filePath){
 void MainWindow::extractRosbagMetadata(const QString &filePath)
 {
 
-    rosbag2_storage::StorageOptions storage_options;
+    rosbag2_cpp::StorageOptions storage_options;
     storage_options.uri = filePath.toStdString();
+    storage_options.storage_id = "sqlite3";
 
     rosbag2_cpp::ConverterOptions converter_options;
     converter_options.input_serialization_format = "cdr";
     converter_options.output_serialization_format = "cdr";
 
     std::shared_ptr<rosbag2_storage::SerializedBagMessage> msg;
-
-
 
     try {
         reader.open(storage_options, converter_options);
@@ -143,27 +142,29 @@ void MainWindow::extractRosbagMetadata(const QString &filePath)
     }
 }
 
-void MainWindow::setPaletteError(){
+void MainWindow::setPaletteError()
+{
 
     status_bar_palette_.setColor(QPalette::WindowText, Qt::red);
     statusBar()->setPalette(status_bar_palette_);
 
 }
 
-void MainWindow::setPaletteNormal(){
+void MainWindow::setPaletteNormal()
+{
 
     status_bar_palette_.setColor(QPalette::WindowText, Qt::white);
     statusBar()->setPalette(status_bar_palette_);
 
 }
 
-void MainWindow::setPaletteOk(){
+void MainWindow::setPaletteOk()
+{
 
     status_bar_palette_.setColor(QPalette::WindowText, Qt::green);
     statusBar()->setPalette(status_bar_palette_);
 
 }
-
 
 void MainWindow::on_applyButton_clicked()
 {
@@ -197,12 +198,12 @@ void MainWindow::on_applyButton_clicked()
 
 }
 
-
 void MainWindow::on_inputList_itemSelectionChanged()
 {
 
 
 }
+
 void MainWindow::on_removeButton_clicked()
 {
     QList<QTableWidgetItem*> selectedItems = ui->outputList->selectedItems();
@@ -272,12 +273,13 @@ void MainWindow::on_saveBtn_clicked()
 
         reader.reset_filter();
 
-        rosbag2_storage::StorageOptions storage_options;
+        rosbag2_cpp::StorageOptions storage_options;
         storage_options.uri = fullFilePath.toStdString();
         storage_options.storage_id = "sqlite3";
 
         auto storage_factory = std::make_shared<rosbag2_storage::StorageFactory>();
-        auto storage = storage_factory->open_read_write(storage_options);
+        // auto storage = storage_factory->open_read_write(storage_options);
+        auto storage = storage_factory->open_read_write(storage_options.uri, storage_options.storage_id);
 
         const auto metadata = reader.get_metadata();
 
@@ -348,7 +350,6 @@ void MainWindow::enableSaveButton()
     ui->saveBtn->setEnabled(true);
 }
 
-
 void MainWindow::on_actionOpen_Directory_triggered()
 {
     QString directoryPath = QFileDialog::getExistingDirectory(this, "Open Directory", QDir::homePath());
@@ -405,12 +406,10 @@ void MainWindow::onTreeItemDoubleClicked(QTreeWidgetItem *item, int column) {
 
 }
 
-
 void MainWindow::on_actionOpen_Rosbag_triggered()
 {
     on_loadBtn_clicked();
 }
-
 
 void MainWindow::on_outputList_itemChanged(QTableWidgetItem *item)
 {
@@ -425,7 +424,6 @@ void MainWindow::on_outputList_itemChanged(QTableWidgetItem *item)
 
     }
 }
-
 
 void MainWindow::on_actionrosbag2csv_triggered()
 {

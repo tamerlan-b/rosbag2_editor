@@ -12,6 +12,7 @@
 #include <rosbag2_cpp/readers/sequential_reader.hpp>
 #include <rosbag2_cpp/typesupport_helpers.hpp>
 #include "newprojectdialog.h"
+#include <unordered_set>
 
 
 QT_BEGIN_NAMESPACE
