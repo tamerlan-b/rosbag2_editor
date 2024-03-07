@@ -1,5 +1,4 @@
-#ifndef NEWPROJECTDIALOG_H
-#define NEWPROJECTDIALOG_H
+#pragma once
 
 #include <QDialog>
 #include <QString>
@@ -26,6 +25,3 @@ private:
     Ui::NewProjectDialog *ui;
 
 };
-
-
-#endif // NEWPROJECTDIALOG_H

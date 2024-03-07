@@ -1,5 +1,4 @@
-#ifndef MAINWINDOW_H
-#define MAINWINDOW_H
+#pragma once
 
 #include <QMainWindow>
 #include <QFileDialog>
@@ -13,6 +12,9 @@
 #include <rosbag2_cpp/typesupport_helpers.hpp>
 #include "newprojectdialog.h"
 #include <unordered_set>
+
+#include <rosbag2_storage/bag_metadata.hpp>
+#include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
 
 
 QT_BEGIN_NAMESPACE
@@ -58,6 +60,7 @@ private slots:
 
     void on_actionContacts_triggered();
 
+
 private:
     Ui::MainWindow *ui;
     QPalette status_bar_palette_;
@@ -85,6 +88,6 @@ private:
     void setPaletteNormal();
     void setPaletteOk();
     void enableSaveButton();
-
+    void change_metadata(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage, const rosbag2_storage::BagMetadata& metadata);
+    void write_bag_file(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage);
 };
-#endif // MAINWINDOW_H

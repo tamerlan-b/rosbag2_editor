@@ -14,6 +14,7 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 
 find_package(ament_cmake REQUIRED)
 find_package(rosbag2_cpp REQUIRED)
+find_package(rosbag2_storage REQUIRED)
 
 set(PROJECT_SOURCES
         main.cpp
@@ -31,7 +32,7 @@ add_executable(ros2bag_editor
 )
 
 target_include_directories(ros2bag_editor PRIVATE ${rosbag2_cpp_INCLUDE_DIRS})
-ament_target_dependencies(ros2bag_editor PUBLIC rosbag2_cpp)
+ament_target_dependencies(ros2bag_editor PUBLIC rosbag2_cpp rosbag2_storage)
 target_link_libraries(ros2bag_editor PRIVATE
     Qt${QT_VERSION_MAJOR}::Widgets
 )

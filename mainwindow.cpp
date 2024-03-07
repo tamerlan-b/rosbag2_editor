@@ -4,7 +4,6 @@
 
 #include <QDebug>
 
-
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
@@ -236,9 +235,63 @@ void MainWindow::on_removeButton_clicked()
     statusBar()->showMessage("Topic removed from output file: " + removed_topic, 3000);
 }
 
+void MainWindow::change_metadata(
+    std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage, 
+    const rosbag2_storage::BagMetadata& metadata)
+{
+    for(const auto &topic_metadata : metadata.topics_with_message_count)
+    {
+        if(topic_whitelist_.find(topic_metadata.topic_metadata.name)!= topic_whitelist_.end())
+        {
+            auto it = topic_rename_.find(topic_metadata.topic_metadata.name);
+            if(it!=topic_rename_.end())
+            {
+                rosbag2_storage::TopicMetadata modified_topic_metadata = topic_metadata.topic_metadata;
+                modified_topic_metadata.name = it->second;
+                storage->create_topic(modified_topic_metadata);
+                //qDebug() << "Creating: "<<modified_topic_metadata.name;
+            }
+            else
+            {
+                storage->create_topic(topic_metadata.topic_metadata);
+                //qDebug() << "Creating: "<<topic_metadata.topic_metadata.name;
+            }
+        }
+    }
+}
+
+void MainWindow::write_bag_file(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage)
+{
+    while (this->reader.has_next())
+    {
+        auto bag_message = this->reader.read_next();
+        auto message_timestamp = bag_message->time_stamp;
+
+        double message_timestamp_seconds = static_cast<double>(message_timestamp) * 1e-9;
+        QDateTime message_datetime = QDateTime::fromSecsSinceEpoch(message_timestamp_seconds, Qt::LocalTime);
+
+        auto nanoseconds = std::chrono::nanoseconds(message_timestamp); //TODO: uniform code for ms extraction
+        auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(nanoseconds % std::chrono::seconds(1));
+        message_datetime = message_datetime.addMSecs(milliseconds.count());
+
+        if (message_datetime >= trimStart_ && message_datetime <= trimEnd_)
+        {
+            if (topic_whitelist_.find(bag_message->topic_name) != topic_whitelist_.end())
+            {
+                auto it = topic_rename_.find(bag_message->topic_name);
+                if (it != topic_rename_.end()){bag_message->topic_name.assign(topic_rename_[bag_message->topic_name]);}
+                storage->write(bag_message);
+            }
+        }
+        else
+        {
+            //qDebug() << "Trimming";
+        }
+    }
+}
+
 void MainWindow::on_saveBtn_clicked()
 {
-
     ui->saveBtn->setEnabled(false);
 
     cooldown_timer_.setSingleShot(true);
@@ -248,18 +301,19 @@ void MainWindow::on_saveBtn_clicked()
     try{
 
         QString filePath = input_path_;
-
         QString outName = QString("rosbag2_edit_") + QDateTime::currentDateTime().toString("yy_MM_dd-hh_mm_ss");
-
-
         int append = 1;
         QString baseName = outName;
 
-        try {
-            while (QFileInfo::exists(baseName)) {
+        try
+        {
+            while (QFileInfo::exists(baseName))
+            {
                 baseName = outName + QString("_%1").arg(append++);
             }
-        } catch (...) {
+        }
+        catch (...)
+        {
             //qDebug() << "Error occurred on output file name.";
             return;
         }
@@ -267,15 +321,11 @@ void MainWindow::on_saveBtn_clicked()
         QFileInfo inputFileInfo(input_path_);
         QString outputPath = inputFileInfo.path();
         QString fullFilePath = outputPath + "/" + baseName;
-
         //qDebug() << "Output file path: " << fullFilePath;
-
 
         reader.reset_filter();
 
-        rosbag2_cpp::StorageOptions storage_options;
-        storage_options.uri = fullFilePath.toStdString();
-        storage_options.storage_id = "sqlite3";
+        rosbag2_cpp::StorageOptions storage_options{fullFilePath.toStdString(), "sqlite3"};
 
         auto storage_factory = std::make_shared<rosbag2_storage::StorageFactory>();
         // auto storage = storage_factory->open_read_write(storage_options);
@@ -283,66 +333,20 @@ void MainWindow::on_saveBtn_clicked()
 
         const auto metadata = reader.get_metadata();
 
-        for(const auto &topic_metadata : metadata.topics_with_message_count){
-
-            if(topic_whitelist_.find(topic_metadata.topic_metadata.name)!= topic_whitelist_.end()){
-
-                auto it = topic_rename_.find(topic_metadata.topic_metadata.name);
-                if(it!=topic_rename_.end()){
-                    rosbag2_storage::TopicMetadata modified_topic_metadata = topic_metadata.topic_metadata;
-                    modified_topic_metadata.name = it->second;
-                    storage->create_topic(modified_topic_metadata);
-                    //qDebug() << "Creating: "<<modified_topic_metadata.name;
-                }else{
-                    storage->create_topic(topic_metadata.topic_metadata);
-                    //qDebug() << "Creating: "<<topic_metadata.topic_metadata.name;
-                }
-            }
-        }
+        this->change_metadata(storage, metadata);
 
         reader.reset_filter();
 
-        while (reader.has_next()) {
-
-            auto bag_message = reader.read_next();
-            auto message_timestamp = bag_message->time_stamp;
-
-            double message_timestamp_seconds = static_cast<double>(message_timestamp) * 1e-9;
-            QDateTime message_datetime = QDateTime::fromSecsSinceEpoch(message_timestamp_seconds, Qt::LocalTime);
-
-            auto nanoseconds = std::chrono::nanoseconds(message_timestamp); //TODO: uniform code for ms extraction
-            auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(nanoseconds % std::chrono::seconds(1));
-            message_datetime = message_datetime.addMSecs(milliseconds.count());
-
-
-            if (message_datetime >= trimStart_ && message_datetime <= trimEnd_) {
-
-                if (topic_whitelist_.find(bag_message->topic_name) != topic_whitelist_.end()) {
-
-                    auto it = topic_rename_.find(bag_message->topic_name);
-                    if (it != topic_rename_.end()){bag_message->topic_name.assign(topic_rename_[bag_message->topic_name]);}
-
-                    storage->write(bag_message);
-
-                }
-
-            }else{
-
-                ////qDebug() << "Trimming";
-
-            }
-
-        }
+        this->write_bag_file(storage);
 
         statusBar()->showMessage("Finished writing output rosbag.", 3000);
 
     }
-    catch (...) {
+    catch (...)
+    {
         //qDebug() << "Error during write.";
         return;
     }
-
-
 }
 
 void MainWindow::enableSaveButton()
@@ -466,7 +470,6 @@ void MainWindow::getTimeInfo() {
 
 }
 
-
 void MainWindow::on_actionSave_triggered()
 {
     try{
@@ -478,7 +481,6 @@ void MainWindow::on_actionSave_triggered()
     }
 }
 
-
 void MainWindow::on_outBeginTime_dateTimeChanged(const QDateTime &dateTime)
 {
     trimStart_ = dateTime;
@@ -486,13 +488,11 @@ void MainWindow::on_outBeginTime_dateTimeChanged(const QDateTime &dateTime)
 
 }
 
-
 void MainWindow::on_outEndTime_dateTimeChanged(const QDateTime &dateTime)
 {
     trimEnd_ = dateTime;
     ////qDebug() << "trimEnd_ changed:"<<dateTime;
 }
-
 
 void MainWindow::on_actionContacts_triggered()
 {
