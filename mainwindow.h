@@ -14,7 +14,7 @@
 #include <unordered_set>
 
 #include <rosbag2_storage/bag_metadata.hpp>
-#include <rosbag2_storage/storage_interfaces/read_write_interface.hpp>
+#include <rosbag2_cpp/writers/sequential_writer.hpp>
 
 
 QT_BEGIN_NAMESPACE
@@ -88,6 +88,6 @@ private:
     void setPaletteNormal();
     void setPaletteOk();
     void enableSaveButton();
-    void change_metadata(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage, const rosbag2_storage::BagMetadata& metadata);
-    void write_bag_file(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage);
+    void change_metadata(rosbag2_cpp::writers::SequentialWriter& writer, const rosbag2_storage::BagMetadata& metadata);
+    void write_bag_file(rosbag2_cpp::writers::SequentialWriter& writer);
 };

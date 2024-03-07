@@ -236,7 +236,7 @@ void MainWindow::on_removeButton_clicked()
 }
 
 void MainWindow::change_metadata(
-    std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage, 
+    rosbag2_cpp::writers::SequentialWriter& writer, 
     const rosbag2_storage::BagMetadata& metadata)
 {
     for(const auto &topic_metadata : metadata.topics_with_message_count)
@@ -248,19 +248,19 @@ void MainWindow::change_metadata(
             {
                 rosbag2_storage::TopicMetadata modified_topic_metadata = topic_metadata.topic_metadata;
                 modified_topic_metadata.name = it->second;
-                storage->create_topic(modified_topic_metadata);
+                writer.create_topic(modified_topic_metadata);
                 //qDebug() << "Creating: "<<modified_topic_metadata.name;
             }
             else
             {
-                storage->create_topic(topic_metadata.topic_metadata);
+                writer.create_topic(topic_metadata.topic_metadata);
                 //qDebug() << "Creating: "<<topic_metadata.topic_metadata.name;
             }
         }
     }
 }
 
-void MainWindow::write_bag_file(std::shared_ptr<rosbag2_storage::storage_interfaces::ReadWriteInterface> storage)
+void MainWindow::write_bag_file(rosbag2_cpp::writers::SequentialWriter& writer)
 {
     while (this->reader.has_next())
     {
@@ -274,13 +274,18 @@ void MainWindow::write_bag_file(std::shared_ptr<rosbag2_storage::storage_interfa
         auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(nanoseconds % std::chrono::seconds(1));
         message_datetime = message_datetime.addMSecs(milliseconds.count());
 
+        if(message_datetime > trimEnd_)
+        {
+            break;
+        }
+
         if (message_datetime >= trimStart_ && message_datetime <= trimEnd_)
         {
             if (topic_whitelist_.find(bag_message->topic_name) != topic_whitelist_.end())
             {
                 auto it = topic_rename_.find(bag_message->topic_name);
                 if (it != topic_rename_.end()){bag_message->topic_name.assign(topic_rename_[bag_message->topic_name]);}
-                storage->write(bag_message);
+                writer.write(bag_message);
             }
         }
         else
@@ -325,19 +330,18 @@ void MainWindow::on_saveBtn_clicked()
 
         reader.reset_filter();
 
+        rosbag2_cpp::writers::SequentialWriter writer;
         rosbag2_cpp::StorageOptions storage_options{fullFilePath.toStdString(), "sqlite3"};
-
-        auto storage_factory = std::make_shared<rosbag2_storage::StorageFactory>();
-        // auto storage = storage_factory->open_read_write(storage_options);
-        auto storage = storage_factory->open_read_write(storage_options.uri, storage_options.storage_id);
+        rosbag2_cpp::ConverterOptions converter_options({"cdr", "cdr"});
+        writer.open(storage_options, converter_options);
 
         const auto metadata = reader.get_metadata();
-
-        this->change_metadata(storage, metadata);
+        this->change_metadata(writer, metadata);
 
         reader.reset_filter();
+        this->write_bag_file(writer);
 
-        this->write_bag_file(storage);
+        qDebug() << "Finished writing output rosbag.";
 
         statusBar()->showMessage("Finished writing output rosbag.", 3000);
 
